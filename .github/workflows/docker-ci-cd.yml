@@ -45,7 +45,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'  # ✅ Correct branch check for 'master'
+    if: github.ref == 'refs/heads/master'  # deploy only on master branch
     steps:
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v0.1.7
