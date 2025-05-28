@@ -42,10 +42,18 @@ jobs:
           push: true
           tags: nitheesh2005/code-sync-client:latest
 
+      - name: Build and push worker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./worker
+          file: ./worker/Dockerfile
+          push: true
+          tags: nitheesh2005/code-sync-worker:latest
+
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'  # deploy only on master branch
+    if: github.ref == 'refs/heads/master' # deploy only on master branch
     steps:
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v0.1.7
@@ -54,13 +62,24 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
+            # Pull latest images
             docker pull nitheesh2005/code-sync-server:latest
             docker pull nitheesh2005/code-sync-client:latest
+            docker pull nitheesh2005/code-sync-worker:latest
 
+            # Stop and remove existing containers if any (ignore errors)
             docker stop code-sync-server || true
             docker rm code-sync-server || true
-            docker run -d --name code-sync-server -p 3000:3000 nitheesh2005/code-sync-server:latest
 
             docker stop code-sync-client || true
             docker rm code-sync-client || true
+
+            docker stop code-sync-worker || true
+            docker rm code-sync-worker || true
+
+            # Run containers with proper ports and options
+            docker run -d --name code-sync-server -p 3000:3000 nitheesh2005/code-sync-server:latest
+
             docker run -d --name code-sync-client -p 5173:5173 nitheesh2005/code-sync-client:latest
+
+            docker run -d --name code-sync-worker -p 4000:4000 nitheesh2005/code-sync-worker:latest
