@@ -44,8 +44,13 @@ jobs:
 
   deploy:
     needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'  # deploy only on master branch
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    if: github.ref == 'refs/heads/master'
+    
     steps:
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v0.1.7
@@ -64,3 +69,4 @@ jobs:
             docker stop code-sync-client || true
             docker rm code-sync-client || true
             docker run -d --name code-sync-client -p 5173:5173 nitheesh2005/code-sync-client:latest
+
