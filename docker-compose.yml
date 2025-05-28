@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  server:
+    container_name: code-sync-server
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    command: npm run dev
+    networks:
+      - Code-Sync
+
+  client:
+    container_name: code-sync-client
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    command: npm run dev
+    depends_on:
+      - server
+    networks:
+      - Code-Sync
+
+networks:
+  Code-Sync:
+    driver: bridge
