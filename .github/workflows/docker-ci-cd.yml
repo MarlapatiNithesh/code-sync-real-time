@@ -2,9 +2,9 @@ name: Docker CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build-and-push:
@@ -45,7 +45,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'  # optional: deploy only on main branch pushes
+    if: github.ref == 'refs/heads/master'  # ✅ Correct branch check for 'master'
     steps:
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v0.1.7
@@ -56,9 +56,11 @@ jobs:
           script: |
             docker pull nitheesh2005/code-sync-server:latest
             docker pull nitheesh2005/code-sync-client:latest
+
             docker stop code-sync-server || true
             docker rm code-sync-server || true
             docker run -d --name code-sync-server -p 3000:3000 nitheesh2005/code-sync-server:latest
+
             docker stop code-sync-client || true
             docker rm code-sync-client || true
             docker run -d --name code-sync-client -p 5173:5173 nitheesh2005/code-sync-client:latest
