@@ -48,13 +48,17 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}  # Make sure this is a valid PEM-formatted private key
+          port: 22
+          debug: true
           script: |
-            # Pull latest images
+            echo "Deploying Code Sync..."
+
+            # Pull latest Docker images
             docker pull nitheesh2005/code-sync-server:latest
             docker pull nitheesh2005/code-sync-client:latest
 
-            # Stop and remove existing containers if running
+            # Stop and remove existing containers
             docker stop code-sync-server || true
             docker rm code-sync-server || true
 
