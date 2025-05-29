@@ -6,32 +6,28 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-      target: dev
+      # target removed – uses final production image
     ports:
       - "3000:3000"
-    volumes:
-      - ./server:/app
-      - /app/node_modules
-    command: npm run dev
     networks:
       - Code-Sync
+    restart: always
+    command: npm run start
 
   client:
     container_name: code-sync-client
     build:
       context: ./client
       dockerfile: Dockerfile
-      target: dev
+      # target removed – uses final production image
     ports:
       - "5173:5173"
-    volumes:
-      - ./client:/app
-      - /app/node_modules
-    command: npm run dev
-    depends_on:
-      - server
     networks:
       - Code-Sync
+    depends_on:
+      - server
+    restart: always
+    command: serve -s dist -l 5173  # adjust if using a different static server
 
 networks:
   Code-Sync:
