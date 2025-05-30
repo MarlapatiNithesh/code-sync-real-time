@@ -9,8 +9,14 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Copy all source files including .env
+# Explicitly copy .env first (make sure it's in your build context)
+COPY .env ./
+
+# Copy the rest of your source files
 COPY . ./
+
+# Optional: list files to verify .env presence
+RUN ls -la /app
 
 # Build the app (update if you're using tsc, vite, next, etc.)
 RUN npm run build
@@ -23,12 +29,12 @@ FROM node:18-alpine AS runner
 
 WORKDIR /app
 
-# Copy only the needed files from builder
+# Copy build output and dependencies from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/.env ./  # ✅ Include .env file
+COPY --from=builder /app/.env ./    # Copy .env from builder to runner
 
 # Set environment
 ENV NODE_ENV=production
