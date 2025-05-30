@@ -3,30 +3,35 @@
 # --- Stage 1: Build the Vite App ---
 FROM node:18-alpine AS builder
 
+# Set working directory
 WORKDIR /app
 
-# Install dependencies
+# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm ci
 
-# Copy source and build
+# Copy source code and environment files
 COPY . .
+
+# Optional: if your env file is named differently, rename it here
+# COPY .env.production .env
+
+# Build the Vite app (uses .env if present)
 RUN npm run build
 
-# --- Stage 2: Serve the built files using a lightweight server (like nginx or a node server) ---
-# Option A: Using a simple static server (serve package)
+# --- Stage 2: Serve the built files using serve ---
 FROM node:18-alpine AS runner
 
 WORKDIR /app
 
-# Install a lightweight static file server
+# Install serve
 RUN npm install -g serve
 
-# Copy the built frontend
+# Copy only the built frontend files
 COPY --from=builder /app/dist ./dist
 
-# Expose the port serve will run on
+# Expose the port the app will run on
 EXPOSE 5173
 
-# Start the static server
+# Serve the app
 CMD ["serve", "-s", "dist", "-l", "5173"]

@@ -24,7 +24,13 @@ const limiter = rateLimit({
 app.use(limiter)
 
 app.use(express.json())
-app.use(cors())
+app.use(
+	cors({
+		origin: process.env.CLIENT_URL || "*", // restrict to specific domain in production
+		methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+		credentials: true,
+	})
+)
 
 // Serve static files
 app.use(express.static(path.join(__dirname, "public")))

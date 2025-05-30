@@ -27,7 +27,7 @@ export const useSocket = (): SocketContextType => {
     return context
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://ec2-13-203-105-9.ap-south-1.compute.amazonaws.com:3000"
 
 const SocketProvider = ({ children }: { children: ReactNode }) => {
     const {
