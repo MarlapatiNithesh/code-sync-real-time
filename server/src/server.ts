@@ -14,7 +14,7 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 3000
 
-// Optional: Rate limiter for security
+// Rate limiter for security
 const limiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
 	max: 100, // limit each IP
@@ -24,9 +24,14 @@ const limiter = rateLimit({
 app.use(limiter)
 
 app.use(express.json())
+
+// Normalize client URL to remove trailing slash if present
+const clientUrlRaw = process.env.CLIENT_URL || "*"
+const clientUrl = clientUrlRaw.endsWith("/") ? clientUrlRaw.slice(0, -1) : clientUrlRaw
+
 app.use(
 	cors({
-		origin: process.env.CLIENT_URL || "*", // restrict to specific domain in production
+		origin: clientUrl,
 		methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 		credentials: true,
 	})
@@ -39,7 +44,9 @@ const server = http.createServer(app)
 
 const io = new Server(server, {
 	cors: {
-		origin: process.env.CLIENT_URL || "*", // Use env-based CORS for safety
+		origin: clientUrl,
+		methods: ["GET", "POST"],
+		credentials: true,
 	},
 	maxHttpBufferSize: 1e8,
 	pingTimeout: 60000,
@@ -72,7 +79,6 @@ function getUserBySocketId(socketId: SocketId): User | null {
 io.on("connection", (socket: Socket) => {
 	console.log(`Socket connected: ${socket.id}`)
 
-	// Join Request
 	socket.on(SocketEvent.JOIN_REQUEST, ({ roomId, username }) => {
 		const isUsernameExist = getUsersInRoom(roomId).some(
 			(u) => u.username === username
