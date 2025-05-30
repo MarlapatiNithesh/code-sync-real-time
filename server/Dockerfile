@@ -34,7 +34,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/.env ./    # Copy .env from builder to runner
+
+# Copy the .env file explicitly with full path
+COPY --from=builder /app/.env /app/.env
 
 # Set environment
 ENV NODE_ENV=production
