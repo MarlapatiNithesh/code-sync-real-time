@@ -17,7 +17,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
+          #port: 22
           debug: true
           script: |
             echo "Deploying Code Sync..."
