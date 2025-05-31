@@ -15,7 +15,7 @@ function UsersView() {
     const { setStatus } = useAppContext()
     const { socket } = useSocket()
 
-    const fallbackCopy = (text) => {
+    const fallbackCopy = (text:string) => {
         const textarea = document.createElement("textarea")
         textarea.value = text
         textarea.style.position = "fixed"
