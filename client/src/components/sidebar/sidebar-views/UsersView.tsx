@@ -15,24 +15,50 @@ function UsersView() {
     const { setStatus } = useAppContext()
     const { socket } = useSocket()
 
+    const fallbackCopy = (text) => {
+        const textarea = document.createElement("textarea")
+        textarea.value = text
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        try {
+            document.execCommand("copy")
+            toast.success("URL copied to clipboard (fallback)")
+        } catch (err) {
+            toast.error("Copy failed")
+            console.error(err)
+        }
+        document.body.removeChild(textarea)
+    }
+
     const copyURL = async () => {
         const url = window.location.href
-        try {
-            await navigator.clipboard.writeText(url)
-            toast.success("URL copied to clipboard")
-        } catch (error) {
-            toast.error("Unable to copy URL to clipboard")
-            console.log(error)
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(url)
+                toast.success("URL copied to clipboard")
+            } catch (error) {
+                console.error(error)
+                fallbackCopy(url)
+            }
+        } else {
+            fallbackCopy(url)
         }
     }
 
     const shareURL = async () => {
         const url = window.location.href
-        try {
-            await navigator.share({ url })
-        } catch (error) {
-            toast.error("Unable to share URL")
-            console.log(error)
+        if (navigator.share) {
+            try {
+                await navigator.share({ url })
+            } catch (error) {
+                console.error(error)
+                toast.error("Unable to share URL")
+            }
+        } else {
+            toast.error("Web Share API not supported on this device")
         }
     }
 
