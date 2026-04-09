@@ -264,10 +264,35 @@ io.on("connection", (socket: Socket) => {
 	})
 })
 
+app.get("/ping", (req: Request, res: Response) => {
+	res.status(200).send("pong")
+})
+
 app.get("/", (req: Request, res: Response) => {
 	res.sendFile(path.join(__dirname, "..", "public", "index.html"))
 })
 
 server.listen(PORT, () => {
 	console.log(`✅ Server running on http://localhost:${PORT}`)
+
+	// --- Keep-Alive Ping Logic ---
+	const frontendUrl = process.env.CLIENT_URL || "*"
+	// Render sets RENDER_EXTERNAL_URL to the public URL of your service automatically
+	const backendUrl = `https://code-sync-real-time.onrender.com`
+
+	const pingUrls = [frontendUrl, backendUrl]
+
+	setInterval(() => {
+		pingUrls.forEach((url) => {
+			if (url && url !== "*" && !url.includes("localhost")) {
+				fetch(`${url}${url === backendUrl ? "/ping" : ""}`)
+					.then((res) => {
+						console.log(`Pinged ${url} successfully. Status: ${res.status}`)
+					})
+					.catch((err) => {
+						console.error(`Error pinging ${url}:`, err.message)
+					})
+			}
+		})
+	}, 1 * 60 * 1000) // 1 minute (60000 ms)
 })
