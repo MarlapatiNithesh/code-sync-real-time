@@ -5,7 +5,7 @@ import {
     FileSystemItem,
     Id,
 } from "@/types/file"
-import { SocketEvent } from "@/types/socket"
+import { SocketEvent, FileLockInfo } from "@/types/socket"
 import { RemoteUser } from "@/types/user"
 import {
     findParentDirectory,
@@ -40,7 +40,7 @@ export const useFileSystem = (): FileContextType => {
 
 function FileContextProvider({ children }: { children: ReactNode }) {
     const { socket } = useSocket()
-    const { setUsers, drawingData } = useAppContext()
+    const { setUsers, drawingData, setDrawingData, currentUser } = useAppContext()
 
     const [fileStructure, setFileStructure] =
         useState<FileSystemItem>(initialFileStructure)
@@ -51,6 +51,26 @@ function FileContextProvider({ children }: { children: ReactNode }) {
         useState<FileSystemItem[]>(initialOpenFiles)
     const [activeFile, setActiveFile] = useState<FileSystemItem | null>(
         openFiles[0],
+    )
+    const [fileLocks, setFileLocks] = useState<Record<string, FileLockInfo>>({})
+
+    const isFileEditable = useCallback(
+        (fileId: Id) => {
+            const lock = fileLocks[fileId]
+            if (!lock) return true
+            return lock.socketId === currentUser.socketId
+        },
+        [currentUser.socketId, fileLocks],
+    )
+
+    const isLineEditable = useCallback(
+        (fileId: Id, lineNumber: number) => {
+            const lockKey = `${fileId}:${lineNumber}`
+            const lock = fileLocks[lockKey]
+            if (!lock) return true
+            return lock.socketId === currentUser.socketId
+        },
+        [currentUser.socketId, fileLocks],
     )
 
     // Function to toggle the isOpen property of a directory (Directory Open/Close)
@@ -742,6 +762,81 @@ function FileContextProvider({ children }: { children: ReactNode }) {
         [deleteFile],
     )
 
+
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            socket.emit(SocketEvent.ROOM_SNAPSHOT, {
+                fileStructure,
+                drawingData,
+            })
+        }, 5000)
+
+        return () => clearTimeout(timer)
+    }, [drawingData, fileStructure, socket])
+
+    useEffect(() => {
+        const handleJoinAccepted = ({
+            fileStructure: serverFileStructure,
+            drawingData: serverDrawingData,
+            locks,
+        }: {
+            fileStructure?: FileSystemItem
+            drawingData?: unknown
+            locks?: Record<string, FileLockInfo>
+        }) => {
+            if (serverFileStructure) {
+                setFileStructure(serverFileStructure)
+                const files =
+                    serverFileStructure.children?.filter(
+                        (item) => item.type === "file",
+                    ) || []
+                setOpenFiles(files)
+                setActiveFile(files[0] || null)
+            }
+
+            if (serverDrawingData) {
+                setDrawingData(serverDrawingData as typeof drawingData)
+            }
+
+            if (locks) {
+                setFileLocks(locks)
+            }
+        }
+
+        const handleLockState = ({
+            locks,
+        }: {
+            locks: Record<string, FileLockInfo>
+        }) => {
+            setFileLocks(locks || {})
+        }
+
+        const handleLockDenied = ({
+            fileId,
+            lock,
+        }: {
+            fileId: string
+            lock?: FileLockInfo
+        }) => {
+            if (lock) {
+                toast.error(`${lock.username} is editing this file`)
+            } else {
+                toast.error(`File ${fileId} is locked by another user`)
+            }
+        }
+
+        socket.on(SocketEvent.JOIN_ACCEPTED, handleJoinAccepted)
+        socket.on(SocketEvent.FILE_LOCK_STATE, handleLockState)
+        socket.on(SocketEvent.FILE_LOCK_DENIED, handleLockDenied)
+
+        return () => {
+            socket.off(SocketEvent.JOIN_ACCEPTED, handleJoinAccepted)
+            socket.off(SocketEvent.FILE_LOCK_STATE, handleLockState)
+            socket.off(SocketEvent.FILE_LOCK_DENIED, handleLockDenied)
+        }
+    }, [setDrawingData, socket])
+
     useEffect(() => {
         socket.once(SocketEvent.SYNC_FILE_STRUCTURE, handleFileStructureSync)
         socket.on(SocketEvent.USER_JOINED, handleUserJoined)
@@ -785,6 +880,9 @@ function FileContextProvider({ children }: { children: ReactNode }) {
                 fileStructure,
                 openFiles,
                 activeFile,
+                fileLocks,
+                isFileEditable,
+                isLineEditable,
                 setActiveFile,
                 closeFile,
                 toggleDirectory,

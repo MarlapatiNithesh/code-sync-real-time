@@ -1,48 +1,24 @@
 # syntax=docker/dockerfile:1
 
-# --- Stage 1: Build the application ---
-FROM node:18-alpine AS builder
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm ci
+COPY pom.xml ./
+RUN mvn -B dependency:go-offline
 
-# Explicitly copy .env first (make sure it's in your build context)
-COPY .env ./
+COPY src ./src
+RUN mvn -B package -DskipTests
 
-# Copy the rest of your source files
-COPY . ./
-
-# Optional: list files to verify .env presence
-RUN ls -la /app
-
-# Build the app (update if you're using tsc, vite, next, etc.)
-RUN npm run build
-
-# Remove dev dependencies for a lighter production image
-RUN npm prune --omit=dev
-
-# --- Stage 2: Production image ---
-FROM node:18-alpine AS runner
+FROM eclipse-temurin:21-jre-alpine AS runner
 
 WORKDIR /app
 
-# Copy build output and dependencies from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/target/code-sync-server-1.0.0.jar ./app.jar
 
-# Copy the .env file explicitly with full path
-COPY --from=builder /app/.env /app/.env
+ENV PORT=3000
 
-# Set environment
-ENV NODE_ENV=production
-
-# Expose the application port
 EXPOSE 3000
+EXPOSE 8080
 
-# Run the app
-CMD ["npm", "run", "start"]
+CMD ["java", "-jar", "app.jar"]
