@@ -1,2 +1,25 @@
 start.bat
 TODO.md
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Node/Frontend
+node_modules/
+dist/
+client/.env
+client/vite.config.mts.timestamp-*
+client/vite.config.ts.timestamp-*
+
+# Java/Backend
+server/target/
+server/*.jar
+server/*.class
