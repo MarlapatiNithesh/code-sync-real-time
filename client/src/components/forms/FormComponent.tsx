@@ -1,26 +1,21 @@
 import { useAppContext } from "@/context/AppContext"
+import { useAuth } from "@/context/AuthContext"
 import { useSocket } from "@/context/SocketContext"
 import { SocketEvent } from "@/types/socket"
 import { USER_STATUS } from "@/types/user"
 import { ChangeEvent, FormEvent, useEffect, useRef } from "react"
 import { toast } from "react-hot-toast"
-import { useLocation, useNavigate } from "react-router-dom"
-import { v4 as uuidv4 } from "uuid"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import logo from "@/assets/logo.svg"
 
 const FormComponent = () => {
     const location = useLocation()
+    const { isAuthenticated, user } = useAuth()
     const { currentUser, setCurrentUser, status, setStatus } = useAppContext()
     const { socket } = useSocket()
 
     const usernameRef = useRef<HTMLInputElement | null>(null)
     const navigate = useNavigate()
-
-    const createNewRoomId = () => {
-        setCurrentUser({ ...currentUser, roomId: uuidv4() })
-        toast.success("Created a new Room Id")
-        usernameRef.current?.focus()
-    }
 
     const handleInputChanges = (e: ChangeEvent<HTMLInputElement>) => {
         const name = e.target.name
@@ -53,6 +48,12 @@ const FormComponent = () => {
         setStatus(USER_STATUS.ATTEMPTING_JOIN)
         socket.emit(SocketEvent.JOIN_REQUEST, currentUser)
     }
+
+    useEffect(() => {
+        if (user?.username && currentUser.username.length === 0) {
+            setCurrentUser({ ...currentUser, username: user.username })
+        }
+    }, [currentUser, setCurrentUser, user?.username])
 
     useEffect(() => {
         if (currentUser.roomId.length > 0) return
@@ -90,7 +91,7 @@ const FormComponent = () => {
 
     return (
         <div className="flex w-full max-w-[500px] flex-col items-center justify-center gap-4 p-4 sm:w-[500px] sm:p-8">
-            <img src={logo} alt="Logo" className="w-full"/>
+            <img src={logo} alt="Logo" className="w-full" />
             <form onSubmit={joinRoom} className="flex w-full flex-col gap-4">
                 <input
                     type="text"
@@ -116,12 +117,31 @@ const FormComponent = () => {
                     Join
                 </button>
             </form>
-            <button
-                className="cursor-pointer select-none underline"
-                onClick={createNewRoomId}
-            >
-                Generate Unique Room Id
-            </button>
+            <div className="flex flex-col items-center gap-2 text-sm">
+                {isAuthenticated ? (
+                    <Link
+                        to="/dashboard"
+                        className="text-primary underline underline-offset-2"
+                    >
+                        Go to your rooms dashboard
+                    </Link>
+                ) : (
+                    <>
+                        <Link
+                            to="/login"
+                            className="text-primary underline underline-offset-2"
+                        >
+                            Login
+                        </Link>
+                        <Link
+                            to="/signup"
+                            className="text-primary underline underline-offset-2"
+                        >
+                            Sign up to create rooms
+                        </Link>
+                    </>
+                )}
+            </div>
         </div>
     )
 }

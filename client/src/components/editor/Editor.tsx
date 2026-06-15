@@ -21,19 +21,27 @@ import { cursorTooltipBaseTheme, tooltipField } from "./tooltip"
 
 function Editor() {
     const { users, currentUser } = useAppContext()
-    const { activeFile, setActiveFile } = useFileSystem()
+    const { activeFile, setActiveFile, isLineEditable } = useFileSystem()
     const { theme, language, fontSize } = useSettings()
     const { socket } = useSocket()
     const { viewHeight } = useResponsive()
-    const [timeOut, setTimeOut] = useState(setTimeout(() => {}, 0))
+    const [timeOut, setTimeOut] = useState(setTimeout(() => { }, 0))
     const filteredUsers = useMemo(
         () => users.filter((u) => u.username !== currentUser.username),
         [users, currentUser],
     )
     const [extensions, setExtensions] = useState<Extension[]>([])
+    const [currentLine, setCurrentLine] = useState<number | null>(null)
 
     const onCodeChange = (code: string, view: ViewUpdate) => {
         if (!activeFile) return
+        const pos = view.state?.selection?.main?.head || 0
+        const line = view.state?.doc?.lineAt(pos)?.number || 1
+
+        if (!isLineEditable(activeFile.id, line)) {
+            toast.error("This line is locked by another user")
+            return
+        }
 
         const file: FileSystemItem = { ...activeFile, content: code }
         setActiveFile(file)
@@ -42,6 +50,7 @@ function Editor() {
         socket.emit(SocketEvent.FILE_UPDATED, {
             fileId: activeFile.id,
             newContent: code,
+            lineNumber: line,
         })
         clearTimeout(timeOut)
 
@@ -52,7 +61,52 @@ function Editor() {
         setTimeOut(newTimeOut)
     }
 
-    // Listen wheel event to zoom in/out and prevent page reload
+    const onUpdate = (viewUpdate: ViewUpdate) => {
+        if (!activeFile) return
+        if (viewUpdate.selectionSet) {
+            const pos = viewUpdate.state.selection.main.head
+            const line = viewUpdate.state.doc.lineAt(pos).number
+            if (line !== currentLine) {
+                // Release previous line lock if any
+                if (currentLine !== null) {
+                    socket.emit(SocketEvent.FILE_LOCK_RELEASE, {
+                        fileId: activeFile.id,
+                        lineNumber: currentLine,
+                    })
+                }
+                // Acquire lock on the new line
+                socket.emit(SocketEvent.FILE_LOCK_REQUEST, {
+                    fileId: activeFile.id,
+                    lineNumber: line,
+                })
+                setCurrentLine(line)
+            }
+        }
+    }
+
+    // Clean up locks when file changes or component unmounts
+    useEffect(() => {
+        return () => {
+            if (activeFile && currentLine !== null) {
+                socket.emit(SocketEvent.FILE_LOCK_RELEASE, {
+                    fileId: activeFile.id,
+                    lineNumber: currentLine,
+                })
+            }
+        }
+    }, [activeFile?.id, currentLine, socket])
+
+    useEffect(() => {
+        const handleSave = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+                e.preventDefault()
+                toast.success("Workspace synced and saved!")
+            }
+        }
+        window.addEventListener("keydown", handleSave)
+        return () => window.removeEventListener("keydown", handleSave)
+    }, [])
+
     usePageEvents()
 
     useEffect(() => {
@@ -82,7 +136,9 @@ function Editor() {
         <CodeMirror
             theme={editorThemes[theme]}
             onChange={onCodeChange}
+            onUpdate={onUpdate}
             value={activeFile?.content}
+            editable={true}
             extensions={extensions}
             minHeight="100%"
             maxWidth="100vw"

@@ -15,6 +15,9 @@ interface FileContext {
     fileStructure: FileSystemItem
     openFiles: FileSystemItem[]
     activeFile: FileSystemItem | null
+    fileLocks: Record<string, { fileId: string; lineNumber?: number; socketId: string; username: string }>
+    isFileEditable: (fileId: Id) => boolean
+    isLineEditable: (fileId: Id, lineNumber: number) => boolean
     setActiveFile: (file: FileSystemItem) => void
     closeFile: (fileId: Id) => void
     toggleDirectory: (dirId: Id) => void

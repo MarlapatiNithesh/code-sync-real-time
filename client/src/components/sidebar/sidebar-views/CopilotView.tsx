@@ -8,12 +8,15 @@ import { LuClipboardPaste, LuCopy, LuRepeat } from "react-icons/lu"
 import ReactMarkdown from "react-markdown"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { dracula } from "react-syntax-highlighter/dist/esm/styles/prism"
+import { useState } from "react"
+import { Modal } from "../../common/Modal"
 
 function CopilotView() {
     const {socket} = useSocket()
     const { viewHeight } = useResponsive()
     const { generateCode, output, isRunning, setInput } = useCopilot()
     const { activeFile, updateFileContent, setActiveFile } = useFileSystem()
+    const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false)
 
     const copyOutput = async () => {
         try {
@@ -44,12 +47,14 @@ function CopilotView() {
         }
     }
 
-    const replaceCodeInFile = () => {
+    const handleReplaceClick = () => {
         if (activeFile) {
-            const isConfirmed = confirm(
-                `Are you sure you want to replace the code in the file?`,
-            )
-            if (!isConfirmed) return
+            setIsReplaceConfirmOpen(true)
+        }
+    }
+
+    const confirmReplace = () => {
+        if (activeFile) {
             const content = output.replace(/```[\w]*\n?/g, "").trim()
             updateFileContent(activeFile.id, content)
             // Update the content of the active file if it's the same file
@@ -61,6 +66,7 @@ function CopilotView() {
                 newContent: content,
             })
         }
+        setIsReplaceConfirmOpen(false)
     }
 
     return (
@@ -91,7 +97,7 @@ function CopilotView() {
                     </button>
                     <button
                         title="Replace code in file"
-                        onClick={replaceCodeInFile}
+                        onClick={handleReplaceClick}
                     >
                         <LuRepeat
                             size={18}
@@ -140,6 +146,14 @@ function CopilotView() {
                     {output}
                 </ReactMarkdown>
             </div>
+
+            <Modal
+                isOpen={isReplaceConfirmOpen}
+                title="Replace code in active file?"
+                confirmText="Replace"
+                onConfirm={confirmReplace}
+                onClose={() => setIsReplaceConfirmOpen(false)}
+            />
         </div>
     )
 }

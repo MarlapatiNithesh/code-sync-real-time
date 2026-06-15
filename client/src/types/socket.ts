@@ -26,10 +26,23 @@ enum SocketEvent {
     REQUEST_DRAWING = "request-drawing",
     SYNC_DRAWING = "sync-drawing",
     DRAWING_UPDATE = "drawing-update",
+    ROOM_SNAPSHOT = "room-snapshot",
+    FILE_LOCK_REQUEST = "file-lock-request",
+    FILE_LOCK_GRANTED = "file-lock-granted",
+    FILE_LOCK_DENIED = "file-lock-denied",
+    FILE_LOCK_RELEASE = "file-lock-release",
+    FILE_LOCK_STATE = "file-lock-state",
+    ROOM_NOT_FOUND = "room-not-found",
 }
 
 interface SocketContext {
     socket: Socket
+}
+
+export interface FileLockInfo {
+    fileId: string
+    socketId: string
+    username: string
 }
 
 export { SocketEvent, SocketContext, SocketId }

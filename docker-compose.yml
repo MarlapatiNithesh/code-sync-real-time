@@ -1,34 +1,98 @@
-version: "3.9"
-
 services:
+  mysql:
+    container_name: code-sync-mysql
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: nitheesh
+      MYSQL_DATABASE: codesync
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - Code-Sync
+    restart: always
+
+  redis:
+    container_name: code-sync-redis
+    image: redis:alpine
+    ports:
+      - "127.0.0.1:6380:6379"
+    networks:
+      - Code-Sync
+    restart: always
+
   server:
     container_name: code-sync-server
     build:
       context: ./server
       dockerfile: Dockerfile
-      # target removed – uses final production image
     ports:
       - "3000:3000"
+      - "8080:8080"
+    environment:
+      PORT: 3000
+      API_PORT: 8080
+      DB_URL: jdbc:mysql://mysql:3306/codesync?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: root
+      DB_PASSWORD: nitheesh
+      REDIS_HOST: redis
+      CLIENT_URL: http://localhost:5173
+      JWT_SECRET: code-sync-jwt-secret-change-in-production-min-32-chars
     networks:
       - Code-Sync
+    depends_on:
+      - mysql
+      - redis
     restart: always
-    command: npm run start
+    command: java -jar app.jar
 
   client:
     container_name: code-sync-client
     build:
       context: ./client
       dockerfile: Dockerfile
-      # target removed – uses final production image
+      args:
+        VITE_BACKEND_URL: http://localhost:3000
+        VITE_API_URL: http://localhost:8080
     ports:
-      - "5173:5173"
+      - "5173:80"
     networks:
       - Code-Sync
     depends_on:
       - server
     restart: always
-    command: serve -s dist -l 5173  # adjust if using a different static server
+
+  phpmyadmin:
+    container_name: code-sync-phpmyadmin
+    image: phpmyadmin:latest
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      MYSQL_ROOT_PASSWORD: nitheesh
+    networks:
+      - Code-Sync
+    depends_on:
+      - mysql
+    restart: always
+
+  redis-commander:
+    container_name: code-sync-redis-commander
+    image: rediscommander/redis-commander:latest
+    ports:
+      - "8082:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    networks:
+      - Code-Sync
+    depends_on:
+      - redis
+    restart: always
 
 networks:
   Code-Sync:
     driver: bridge
+
+volumes:
+  mysql_data:

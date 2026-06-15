@@ -1,5 +1,6 @@
 import { DrawingData } from "@/types/app"
 import {
+    FileLockInfo,
     SocketContext as SocketContextType,
     SocketEvent,
     SocketId,
@@ -27,7 +28,7 @@ export const useSocket = (): SocketContextType => {
     return context
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://ec2-13-203-105-9.ap-south-1.compute.amazonaws.com:3000"
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"
 
 const SocketProvider = ({ children }: { children: ReactNode }) => {
     const {
@@ -66,18 +67,48 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
     }, [setStatus])
 
     const handleJoiningAccept = useCallback(
-        ({ user, users }: { user: User; users: RemoteUser[] }) => {
+        ({
+            user,
+            users,
+            fileStructure,
+            drawingData,
+            locks,
+        }: {
+            user: User
+            users: RemoteUser[]
+            fileStructure?: unknown
+            drawingData?: DrawingData
+            locks?: Record<string, FileLockInfo>
+        }) => {
             setCurrentUser(user)
             setUsers(users)
             toast.dismiss()
             setStatus(USER_STATUS.JOINED)
 
+            if (drawingData) {
+                setDrawingData(drawingData)
+            }
+
             if (users.length > 1) {
                 toast.loading("Syncing data, please wait...")
             }
+
+            if (fileStructure) {
+                toast.dismiss()
+            }
+
+            if (locks) {
+                void locks
+            }
         },
-        [setCurrentUser, setStatus, setUsers],
+        [setCurrentUser, setDrawingData, setStatus, setUsers],
     )
+
+    const handleRoomNotFound = useCallback(() => {
+        toast.dismiss()
+        setStatus(USER_STATUS.INITIAL)
+        toast.error("Room not found. Create a room from your dashboard first.")
+    }, [setStatus])
 
     const handleUserLeft = useCallback(
         ({ user }: { user: User }) => {
@@ -106,6 +137,7 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
         socket.on("connect_failed", handleError)
         socket.on(SocketEvent.USERNAME_EXISTS, handleUsernameExist)
         socket.on(SocketEvent.JOIN_ACCEPTED, handleJoiningAccept)
+        socket.on(SocketEvent.ROOM_NOT_FOUND, handleRoomNotFound)
         socket.on(SocketEvent.USER_DISCONNECTED, handleUserLeft)
         socket.on(SocketEvent.REQUEST_DRAWING, handleRequestDrawing)
         socket.on(SocketEvent.SYNC_DRAWING, handleDrawingSync)
@@ -115,6 +147,7 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
             socket.off("connect_failed")
             socket.off(SocketEvent.USERNAME_EXISTS)
             socket.off(SocketEvent.JOIN_ACCEPTED)
+            socket.off(SocketEvent.ROOM_NOT_FOUND)
             socket.off(SocketEvent.USER_DISCONNECTED)
             socket.off(SocketEvent.REQUEST_DRAWING)
             socket.off(SocketEvent.SYNC_DRAWING)
@@ -123,6 +156,7 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
         handleDrawingSync,
         handleError,
         handleJoiningAccept,
+        handleRoomNotFound,
         handleRequestDrawing,
         handleUserLeft,
         handleUsernameExist,
