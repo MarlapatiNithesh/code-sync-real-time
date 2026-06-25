@@ -22,10 +22,35 @@ function RunView() {
         setSelectedLanguage(lang)
     }
 
-    const copyOutput = () => {
-        navigator.clipboard.writeText(output)
-        toast.success("Output copied to clipboard")
+    const copyOutput = async () => {
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(output)
+                toast.success("Output copied to clipboard")
+                return
+            } catch (error) {
+                console.error("Secure clipboard copy failed, using fallback...", error)
+            }
+        }
+
+        // Fallback
+        const textarea = document.createElement("textarea")
+        textarea.value = output
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        try {
+            document.execCommand("copy")
+            toast.success("Output copied to clipboard")
+        } catch (err) {
+            toast.error("Failed to copy output")
+            console.error("Fallback copy failed:", err)
+        }
+        document.body.removeChild(textarea)
     }
+
 
     return (
         <div

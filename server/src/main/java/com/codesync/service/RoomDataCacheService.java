@@ -12,6 +12,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ public class RoomDataCacheService {
     private final RoomRepository roomRepository;
     private final RoomFileRepository roomFileRepository;
     private final ObjectMapper objectMapper;
+    private final StringRedisTemplate stringRedisTemplate;
 
     private final Map<String, CachedRoomData> cache = new ConcurrentHashMap<>();
 
@@ -42,14 +44,54 @@ public class RoomDataCacheService {
     private long flushIntervalMs;
 
     public CachedRoomData getOrLoad(String roomCode) {
-        return cache.computeIfAbsent(roomCode, this::loadFromDatabase);
+        return cache.computeIfAbsent(roomCode, code -> {
+            try {
+                // Try loading from Redis first
+                String redisFileStructure = stringRedisTemplate.opsForValue().get("room:data:fileStructure:" + code);
+                String redisDrawingData = stringRedisTemplate.opsForValue().get("room:data:drawingData:" + code);
+
+                if (redisFileStructure != null) {
+                    log.debug("Loaded room {} file structure from Redis", code);
+                    return CachedRoomData.builder()
+                            .fileStructureJson(redisFileStructure)
+                            .drawingDataJson(redisDrawingData)
+                            .dirty(true) // Mark dirty so it eventually gets flushed to MySQL
+                            .build();
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load room data from Redis for room {}: {}", code, e.getMessage());
+            }
+
+            // Fall back to database
+            CachedRoomData dbData = loadFromDatabase(code);
+
+            try {
+                // Seed Redis cache
+                if (dbData != null) {
+                    if (dbData.getFileStructureJson() != null) {
+                        stringRedisTemplate.opsForValue().set("room:data:fileStructure:" + code, dbData.getFileStructureJson());
+                    }
+                    if (dbData.getDrawingDataJson() != null) {
+                        stringRedisTemplate.opsForValue().set("room:data:drawingData:" + code, dbData.getDrawingDataJson());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to seed Redis cache for room {}: {}", code, e.getMessage());
+            }
+
+            return dbData;
+        });
     }
 
     public void updateFileStructure(String roomCode, Object fileStructure) {
         try {
+            String json = objectMapper.writeValueAsString(fileStructure);
             CachedRoomData cached = getOrLoad(roomCode);
-            cached.setFileStructureJson(objectMapper.writeValueAsString(fileStructure));
+            cached.setFileStructureJson(json);
             cached.setDirty(true);
+
+            // Update in Redis
+            stringRedisTemplate.opsForValue().set("room:data:fileStructure:" + roomCode, json);
         } catch (Exception exception) {
             log.error("Failed to cache file structure for room {}", roomCode, exception);
         }
@@ -57,9 +99,13 @@ public class RoomDataCacheService {
 
     public void updateDrawingData(String roomCode, Object drawingData) {
         try {
+            String json = objectMapper.writeValueAsString(drawingData);
             CachedRoomData cached = getOrLoad(roomCode);
-            cached.setDrawingDataJson(objectMapper.writeValueAsString(drawingData));
+            cached.setDrawingDataJson(json);
             cached.setDirty(true);
+
+            // Update in Redis
+            stringRedisTemplate.opsForValue().set("room:data:drawingData:" + roomCode, json);
         } catch (Exception exception) {
             log.error("Failed to cache drawing data for room {}", roomCode, exception);
         }
@@ -70,8 +116,12 @@ public class RoomDataCacheService {
             CachedRoomData cached = getOrLoad(roomCode);
             JsonNode root = objectMapper.readTree(cached.getFileStructureJson());
             if (patchFileNode(root, fileId, newContent)) {
-                cached.setFileStructureJson(objectMapper.writeValueAsString(root));
+                String json = objectMapper.writeValueAsString(root);
+                cached.setFileStructureJson(json);
                 cached.setDirty(true);
+
+                // Update in Redis
+                stringRedisTemplate.opsForValue().set("room:data:fileStructure:" + roomCode, json);
             }
         } catch (Exception exception) {
             log.error("Failed to patch file {} in room {}", fileId, roomCode, exception);
@@ -97,11 +147,25 @@ public class RoomDataCacheService {
     }
 
     public void seedCache(RoomEntity room) {
+        String fileJson = room.getFileStructureJson();
+        String drawingJson = room.getDrawingDataJson();
+
         cache.put(room.getRoomCode(), CachedRoomData.builder()
-                .fileStructureJson(room.getFileStructureJson())
-                .drawingDataJson(room.getDrawingDataJson())
+                .fileStructureJson(fileJson)
+                .drawingDataJson(drawingJson)
                 .dirty(false)
                 .build());
+
+        try {
+            if (fileJson != null) {
+                stringRedisTemplate.opsForValue().set("room:data:fileStructure:" + room.getRoomCode(), fileJson);
+            }
+            if (drawingJson != null) {
+                stringRedisTemplate.opsForValue().set("room:data:drawingData:" + room.getRoomCode(), drawingJson);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to seed Redis cache for room {}: {}", room.getRoomCode(), e.getMessage());
+        }
     }
 
     @Scheduled(fixedDelayString = "${app.cache.flush-interval-ms}")

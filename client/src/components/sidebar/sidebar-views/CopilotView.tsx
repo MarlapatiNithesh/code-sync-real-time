@@ -19,15 +19,35 @@ function CopilotView() {
     const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false)
 
     const copyOutput = async () => {
-        try {
-            const content = output.replace(/```[\w]*\n?/g, "").trim()
-            await navigator.clipboard.writeText(content)
-            toast.success("Output copied to clipboard")
-        } catch (error) {
-            toast.error("Unable to copy output to clipboard")
-            console.log(error)
+        const content = output.replace(/```[\w]*\n?/g, "").trim()
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(content)
+                toast.success("Output copied to clipboard")
+                return
+            } catch (error) {
+                console.error("Secure clipboard copy failed, using fallback...", error)
+            }
         }
+
+        // Fallback
+        const textarea = document.createElement("textarea")
+        textarea.value = content
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        try {
+            document.execCommand("copy")
+            toast.success("Output copied to clipboard")
+        } catch (err) {
+            toast.error("Unable to copy output to clipboard")
+            console.error("Fallback copy failed:", err)
+        }
+        document.body.removeChild(textarea)
     }
+
 
     const pasteCodeInFile = () => {
         if (activeFile) {

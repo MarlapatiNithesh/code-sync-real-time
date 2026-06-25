@@ -32,7 +32,14 @@ export default defineConfig({
     preview: {
         port: 5173
     },
-    server:{
+    server: {
         open: true,
+        proxy: {
+            "/piston-api": {
+                target: "http://localhost:2000/api/v2",
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/piston-api/, ""),
+            }
+        }
     }
 })

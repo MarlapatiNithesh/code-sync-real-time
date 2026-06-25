@@ -21,4 +21,5 @@ public class RoomResponse {
     private String ownerUsername;
     private Instant createdAt;
     private Instant updatedAt;
+    private java.util.List<String> participants;
 }

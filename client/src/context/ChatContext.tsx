@@ -33,8 +33,17 @@ function ChatContextProvider({ children }: { children: ReactNode }) {
                 setIsNewMessage(true)
             },
         )
+        socket.on(
+            SocketEvent.JOIN_ACCEPTED,
+            ({ messages: serverMessages }: { messages?: ChatMessage[] }) => {
+                if (serverMessages) {
+                    setMessages(serverMessages)
+                }
+            },
+        )
         return () => {
             socket.off(SocketEvent.RECEIVE_MESSAGE)
+            socket.off(SocketEvent.JOIN_ACCEPTED)
         }
     }, [socket])
 

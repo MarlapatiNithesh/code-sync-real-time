@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -39,11 +38,13 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/ping").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/index.html").permitAll()
-                        .requestMatchers("/api/rooms/code/**").permitAll()
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/**", "OPTIONS")).permitAll()
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/auth/signup")).permitAll()
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/auth/login")).permitAll()
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/ping", "GET")).permitAll()
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/", "GET")).permitAll()
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/index.html", "GET")).permitAll()
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/rooms/code/**")).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -64,7 +65,15 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        
+        String normalizedOrigin = normalizeOrigin(clientUrl);
+        if ("*".equals(normalizedOrigin)) {
+            configuration.setAllowedOriginPatterns(List.of("*"));
+        } else {
+            configuration.setAllowedOrigins(List.of(normalizedOrigin));
+            configuration.setAllowedOriginPatterns(List.of(normalizedOrigin));
+        }
+        
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

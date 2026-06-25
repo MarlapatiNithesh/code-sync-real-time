@@ -44,6 +44,7 @@ services:
     depends_on:
       - mysql
       - redis
+      - piston
     restart: always
     command: java -jar app.jar
 
@@ -90,9 +91,22 @@ services:
       - redis
     restart: always
 
+  piston:
+    container_name: code-sync-piston
+    image: ghcr.io/engineer-man/piston:latest
+    restart: always
+    privileged: true
+    ports:
+      - "127.0.0.1:2000:2000"
+    volumes:
+      - piston_data:/piston/data
+    networks:
+      - Code-Sync
+
 networks:
   Code-Sync:
     driver: bridge
 
 volumes:
   mysql_data:
+  piston_data:

@@ -6,7 +6,7 @@ import SettingsView from "@/components/sidebar/sidebar-views/SettingsView"
 import UsersView from "@/components/sidebar/sidebar-views/UsersView"
 import useWindowDimensions from "@/hooks/useWindowDimensions"
 import { VIEWS, ViewContext as ViewContextType } from "@/types/view"
-import { ReactNode, createContext, useContext, useState } from "react"
+import { ReactNode, createContext, useContext, useEffect, useState } from "react"
 import { IoSettingsOutline } from "react-icons/io5"
 import { LuFiles, LuSparkles } from "react-icons/lu"
 import { PiChats, PiPlay, PiUsers } from "react-icons/pi"
@@ -23,7 +23,14 @@ export const useViews = (): ViewContextType => {
 
 function ViewContextProvider({ children }: { children: ReactNode }) {
     const { isMobile } = useWindowDimensions()
-    const [activeView, setActiveView] = useState<VIEWS>(VIEWS.FILES)
+    const [activeView, setActiveView] = useState<VIEWS>(() => {
+        const stored = sessionStorage.getItem("activeView")
+        return (stored as VIEWS) || VIEWS.FILES
+    })
+
+    useEffect(() => {
+        sessionStorage.setItem("activeView", activeView)
+    }, [activeView])
     const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(!isMobile)
     const [viewComponents] = useState({
         [VIEWS.FILES]: <FilesView />,

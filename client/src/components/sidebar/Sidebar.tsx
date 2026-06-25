@@ -11,7 +11,7 @@ import { IoCodeSlash } from "react-icons/io5"
 import { MdOutlineDraw } from "react-icons/md"
 import cn from "classnames"
 import { Tooltip } from 'react-tooltip'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { tooltipStyles } from "./tooltipStyles"
 
 function Sidebar() {
@@ -28,17 +28,23 @@ function Sidebar() {
     const { isMobile } = useWindowDimensions()
     const [showTooltip, setShowTooltip] = useState(true)
 
+    useEffect(() => {
+        if (activityState === ACTIVITY_STATE.DRAWING && activeView === VIEWS.FILES) {
+            setIsSidebarOpen(false)
+        }
+    }, [activityState, activeView, setIsSidebarOpen])
+
     const changeState = () => {
         setShowTooltip(false)
         if (activityState === ACTIVITY_STATE.CODING) {
             setActivityState(ACTIVITY_STATE.DRAWING)
             socket.emit(SocketEvent.REQUEST_DRAWING)
+            setIsSidebarOpen(false)
         } else {
             setActivityState(ACTIVITY_STATE.CODING)
-        }
-
-        if (isMobile) {
-            setIsSidebarOpen(false)
+            if (!isMobile) {
+                setIsSidebarOpen(true)
+            }
         }
     }
 

@@ -4,7 +4,7 @@ import {
     DrawingData,
 } from "@/types/app"
 import { RemoteUser, USER_STATUS, User } from "@/types/user"
-import { ReactNode, createContext, useContext, useState } from "react"
+import { ReactNode, createContext, useContext, useEffect, useState } from "react"
 
 const AppContext = createContext<AppContextType | null>(null)
 
@@ -25,9 +25,14 @@ function AppContextProvider({ children }: { children: ReactNode }) {
         username: "",
         roomId: "",
     })
-    const [activityState, setActivityState] = useState<ACTIVITY_STATE>(
-        ACTIVITY_STATE.CODING,
-    )
+    const [activityState, setActivityState] = useState<ACTIVITY_STATE>(() => {
+        const stored = sessionStorage.getItem("activityState")
+        return (stored as ACTIVITY_STATE) || ACTIVITY_STATE.CODING
+    })
+
+    useEffect(() => {
+        sessionStorage.setItem("activityState", activityState)
+    }, [activityState])
     const [drawingData, setDrawingData] = useState<DrawingData>(null)
 
     return (

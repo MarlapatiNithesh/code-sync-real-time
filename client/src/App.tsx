@@ -1,6 +1,5 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom"
 import ProtectedRoute from "./components/auth/ProtectedRoute"
-import GitHubCorner from "./components/GitHubCorner"
 import Toast from "./components/toast/Toast"
 import DashboardPage from "./pages/DashboardPage"
 import EditorPage from "./pages/EditorPage"
@@ -35,7 +34,6 @@ const App = () => {
                 </Routes>
             </Router>
             <Toast />
-            <GitHubCorner />
         </>
     )
 }
