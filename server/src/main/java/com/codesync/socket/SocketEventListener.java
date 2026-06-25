@@ -104,16 +104,35 @@ public class SocketEventListener {
         User user = userSessionService.createUser(username, roomId, sessionId(client));
         client.joinRoom(roomId);
 
+        // Track participant in Redis and clear cache for updates
+        stringRedisTemplate.opsForSet().add("room:participants:" + roomId, username);
+        roomService.evictRoomCaches();
+
         broadcastToRoom(roomId, client, SocketEvent.USER_JOINED, Map.of("user", user));
 
         CachedRoomData cachedRoomData = roomDataCacheService.getOrLoad(roomId);
         List<User> users = userSessionService.snapshotUsersInRoom(roomId);
+
+        // Retrieve chat history from Redis
+        String historyKey = "room:chat:history:" + roomId;
+        List<String> rawMessages = stringRedisTemplate.opsForList().range(historyKey, 0, -1);
+        java.util.List<Object> chatHistory = new java.util.ArrayList<>();
+        if (rawMessages != null) {
+            for (String rawMsg : rawMessages) {
+                try {
+                    chatHistory.add(objectMapper.readValue(rawMsg, Object.class));
+                } catch (Exception e) {
+                    // Ignore malformed messages
+                }
+            }
+        }
 
         Map<String, Object> joinPayload = new HashMap<>();
         joinPayload.put("user", user);
         joinPayload.put("users", users);
         joinPayload.put("fileStructure", parseJson(cachedRoomData.getFileStructureJson()));
         joinPayload.put("drawingData", parseJson(cachedRoomData.getDrawingDataJson()));
+        joinPayload.put("messages", chatHistory);
         joinPayload.put("locks", fileLockService.getRoomLockSnapshot(roomId));
         client.sendEvent(SocketEvent.JOIN_ACCEPTED, joinPayload);
     }
@@ -246,9 +265,16 @@ public class SocketEventListener {
                 String topic = "room:chat:" + roomId;
                 Object messagePayload = data.get("message");
                 String jsonMessage = objectMapper.writeValueAsString(messagePayload);
+
+                // Store chat history in Redis list and trim it to last 100 messages
+                String historyKey = "room:chat:history:" + roomId;
+                stringRedisTemplate.opsForList().rightPush(historyKey, jsonMessage);
+                stringRedisTemplate.opsForList().trim(historyKey, -100, -1);
+
+                // Publish for real-time broadcast
                 stringRedisTemplate.convertAndSend(topic, jsonMessage);
             } catch (Exception e) {
-                System.err.println("Failed to publish chat message to Redis: " + e.getMessage());
+                System.err.println("Failed to publish/store chat message: " + e.getMessage());
             }
         });
     }
@@ -300,7 +326,6 @@ public class SocketEventListener {
 
     private void handleDrawingUpdate(SocketIOClient client, Map<String, Object> data, AckRequest ackRequest) {
         userSessionService.getRoomId(sessionId(client)).ifPresent(roomId -> {
-            roomDataCacheService.updateDrawingData(roomId, data.get("snapshot"));
             broadcastToRoom(roomId, client, SocketEvent.DRAWING_UPDATE, Map.of("snapshot", data.get("snapshot")));
         });
     }

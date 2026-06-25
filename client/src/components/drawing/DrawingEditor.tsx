@@ -2,7 +2,7 @@ import { useAppContext } from "@/context/AppContext"
 import { useSocket } from "@/context/SocketContext"
 import useWindowDimensions from "@/hooks/useWindowDimensions"
 import { SocketEvent } from "@/types/socket"
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { HistoryEntry, RecordsDiff, TLRecord, Tldraw, useEditor } from "tldraw"
 
 function DrawingEditor() {
@@ -24,6 +24,7 @@ function ReachEditor() {
     const editor = useEditor()
     const { drawingData, setDrawingData } = useAppContext()
     const { socket } = useSocket()
+    const [hasLoaded, setHasLoaded] = useState(false)
 
     const handleChangeEvent = useCallback(
         (change: HistoryEntry<TLRecord>) => {
@@ -35,8 +36,7 @@ function ReachEditor() {
         },
         [editor.store, setDrawingData, socket],
     )
-
-    // Handle drawing updates from other clients
+    //handle drawing updates from other clients
     const handleRemoteDrawing = useCallback(
         ({ snapshot }: { snapshot: RecordsDiff<TLRecord> }) => {
             editor.store.mergeRemoteChanges(() => {
@@ -58,12 +58,42 @@ function ReachEditor() {
         [editor.store, setDrawingData],
     )
 
+    // Save active page ID whenever the page changes
     useEffect(() => {
-        // Load the drawing data from the context
-        if (drawingData && Object.keys(drawingData).length > 0) {
-            editor.store.loadSnapshot(drawingData)
+        const checkPageChange = () => {
+            const pageId = editor.getCurrentPageId()
+            if (pageId) {
+                sessionStorage.setItem("activePageId", pageId)
+            }
         }
-    }, [])
+
+        const cleanup = editor.store.listen(() => {
+            checkPageChange()
+        })
+
+        return () => cleanup()
+    }, [editor])
+
+    useEffect(() => {
+        if (hasLoaded) return
+        // Load the drawing data from the context
+        if (
+            drawingData &&
+            typeof drawingData === "object" &&
+            "store" in drawingData &&
+            "schema" in drawingData
+        ) {
+            editor.store.loadSnapshot(drawingData)
+
+            // Restore active page ID if saved and exists
+            const savedPageId = sessionStorage.getItem("activePageId")
+            if (savedPageId && editor.store.get(savedPageId as any)) {
+                editor.setCurrentPage(savedPageId as any)
+            }
+
+            setHasLoaded(true)
+        }
+    }, [drawingData, hasLoaded, editor])
 
     useEffect(() => {
         const cleanupFunction = editor.store.listen(handleChangeEvent, {
@@ -79,7 +109,6 @@ function ReachEditor() {
             socket.off(SocketEvent.DRAWING_UPDATE)
         }
     }, [
-        drawingData,
         editor.store,
         handleChangeEvent,
         handleRemoteDrawing,

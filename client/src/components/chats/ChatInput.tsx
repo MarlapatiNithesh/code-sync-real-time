@@ -1,5 +1,4 @@
 import { useAppContext } from "@/context/AppContext"
-import { useChatRoom } from "@/context/ChatContext"
 import { useSocket } from "@/context/SocketContext"
 import { ChatMessage } from "@/types/chat"
 import { SocketEvent } from "@/types/socket"
@@ -11,7 +10,6 @@ import { v4 as uuidV4 } from "uuid"
 function ChatInput() {
     const { currentUser } = useAppContext()
     const { socket } = useSocket()
-    const { setMessages } = useChatRoom()
     const inputRef = useRef<HTMLInputElement | null>(null)
 
     const handleSendMessage = (e: FormEvent<HTMLFormElement>) => {
@@ -27,7 +25,6 @@ function ChatInput() {
                 timestamp: formatDate(new Date().toISOString()),
             }
             socket.emit(SocketEvent.SEND_MESSAGE, { message })
-            setMessages((messages) => [...messages, message])
 
             if (inputRef.current) inputRef.current.value = ""
         }

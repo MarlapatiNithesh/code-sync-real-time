@@ -17,6 +17,10 @@ public interface RoomRepository extends JpaRepository<RoomEntity, UUID> {
     Optional<RoomEntity> findByRoomCode(@Param("roomCode") String roomCode);
 
     @Query("SELECT new com.codesync.dto.RoomSummaryDto(r.id, r.roomCode, r.name, r.owner.id, r.owner.username, r.createdAt, r.updatedAt) " +
+           "FROM RoomEntity r WHERE r.roomCode = :roomCode")
+    Optional<RoomSummaryDto> findSummaryByRoomCode(@Param("roomCode") String roomCode);
+
+    @Query("SELECT new com.codesync.dto.RoomSummaryDto(r.id, r.roomCode, r.name, r.owner.id, r.owner.username, r.createdAt, r.updatedAt) " +
            "FROM RoomEntity r WHERE r.owner = :owner ORDER BY r.createdAt DESC")
     List<RoomSummaryDto> findSummaryByOwnerOrderByCreatedAtDesc(@Param("owner") RegisteredUser owner, org.springframework.data.domain.Pageable pageable);
 

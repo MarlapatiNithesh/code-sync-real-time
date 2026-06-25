@@ -67,7 +67,7 @@ public class AuthService {
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .username(user.getUsername())
+                .username(user.getRealUsername())
                 .build();
     }
 
@@ -76,7 +76,7 @@ public class AuthService {
                 .token(jwtService.generateToken(user))
                 .userId(user.getId())
                 .email(user.getEmail())
-                .username(user.getUsername())
+                .username(user.getRealUsername())
                 .build();
     }
 }

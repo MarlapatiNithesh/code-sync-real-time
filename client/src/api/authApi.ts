@@ -38,6 +38,7 @@ export interface Room {
     ownerUsername: string
     createdAt: string
     updatedAt: string
+    participants?: string[]
 }
 
 export const signup = async (payload: {

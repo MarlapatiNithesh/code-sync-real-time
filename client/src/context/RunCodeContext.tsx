@@ -67,7 +67,7 @@ const RunCodeContextProvider = ({ children }: { children: ReactNode }) => {
 
     const runCode = async () => {
         try {
-            if (!selectedLanguage) {
+            if (!selectedLanguage || !selectedLanguage.language) {
                 return toast.error("Please select a language to run the code")
             } else if (!activeFile) {
                 return toast.error("Please open a file to run the code")
@@ -92,8 +92,14 @@ const RunCodeContextProvider = ({ children }: { children: ReactNode }) => {
             setIsRunning(false)
             toast.dismiss()
         } catch (error: any) {
-            console.error(error.response.data)
-            console.error(error.response.data.error)
+            if (error?.response?.data) {
+                console.error(error.response.data)
+                if (error.response.data.error) {
+                    console.error(error.response.data.error)
+                }
+            } else {
+                console.error(error)
+            }
             setIsRunning(false)
             toast.dismiss()
             toast.error("Failed to run the code")

@@ -7,10 +7,11 @@ import toast from "react-hot-toast"
 import { GoSignOut } from "react-icons/go"
 import { IoShareOutline } from "react-icons/io5"
 import { LuCopy } from "react-icons/lu"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 
 function UsersView() {
     const navigate = useNavigate()
+    const { roomId } = useParams<{ roomId: string }>()
     const { viewHeight } = useResponsive()
     const { setStatus } = useAppContext()
     const { socket } = useSocket()
@@ -25,7 +26,7 @@ function UsersView() {
         textarea.select()
         try {
             document.execCommand("copy")
-            toast.success("URL copied to clipboard (fallback)")
+            toast.success("Room ID copied to clipboard (fallback)")
         } catch (err) {
             toast.error("Copy failed")
             console.error(err)
@@ -33,18 +34,18 @@ function UsersView() {
         document.body.removeChild(textarea)
     }
 
-    const copyURL = async () => {
-        const url = window.location.href
+    const copyRoomId = async () => {
+        const textToCopy = roomId || ""
         if (navigator.clipboard && window.isSecureContext) {
             try {
-                await navigator.clipboard.writeText(url)
-                toast.success("URL copied to clipboard")
+                await navigator.clipboard.writeText(textToCopy)
+                toast.success("Room ID copied to clipboard")
             } catch (error) {
                 console.error(error)
-                fallbackCopy(url)
+                fallbackCopy(textToCopy)
             }
         } else {
-            fallbackCopy(url)
+            fallbackCopy(textToCopy)
         }
     }
 
@@ -85,11 +86,11 @@ function UsersView() {
                     >
                         <IoShareOutline size={26} />
                     </button>
-                    {/* Copy URL button */}
+                    {/* Copy Room ID button */}
                     <button
                         className="flex flex-grow items-center justify-center rounded-md bg-white p-3 text-black"
-                        onClick={copyURL}
-                        title="Copy Link"
+                        onClick={copyRoomId}
+                        title="Copy Room ID"
                     >
                         <LuCopy size={22} />
                     </button>

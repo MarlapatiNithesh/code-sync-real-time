@@ -14,7 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class FileLockService {
 
-    // Key format of roomLocks: roomCode -> Map of (fileId + ":" + lineNumber -> FileLockInfo)
+    // Key format of roomLocks: roomCode -> Map of (fileId + ":" + lineNumber ->
+    // FileLockInfo)
     private final Map<String, Map<String, FileLockInfo>> roomLocks = new ConcurrentHashMap<>();
 
     public Optional<FileLockInfo> getLock(String roomCode, String fileId, int lineNumber) {
@@ -25,7 +26,9 @@ public class FileLockService {
         return Optional.ofNullable(fileLocks.get(fileId + ":" + lineNumber));
     }
 
-    public synchronized LockResult acquireLock(String roomCode, String fileId, int lineNumber, String socketId, String username) {
+    // lock is given based on the roomcode , file id and line number
+    public synchronized LockResult acquireLock(String roomCode, String fileId, int lineNumber, String socketId,
+            String username) {
         Map<String, FileLockInfo> fileLocks = roomLocks.computeIfAbsent(roomCode, key -> new ConcurrentHashMap<>());
         String lockKey = fileId + ":" + lineNumber;
         FileLockInfo existingLock = fileLocks.get(lockKey);
@@ -40,11 +43,13 @@ public class FileLockService {
             fileLocks.put(lockKey, lockInfo);
             return LockResult.granted(lockInfo);
         }
-
+        // lock is denied
         return LockResult.denied(existingLock);
     }
 
-    public synchronized Optional<FileLockInfo> releaseLock(String roomCode, String fileId, int lineNumber, String socketId) {
+    // lock is released based on the roomcode , file id and line number
+    public synchronized Optional<FileLockInfo> releaseLock(String roomCode, String fileId, int lineNumber,
+            String socketId) {
         Map<String, FileLockInfo> fileLocks = roomLocks.get(roomCode);
         if (fileLocks == null) {
             return Optional.empty();
@@ -67,6 +72,7 @@ public class FileLockService {
         return Optional.of(existingLock);
     }
 
+    // release all the locks for a socket
     public synchronized void releaseAllForSocket(String roomCode, String socketId) {
         Map<String, FileLockInfo> fileLocks = roomLocks.get(roomCode);
         if (fileLocks == null) {
@@ -79,6 +85,7 @@ public class FileLockService {
         }
     }
 
+    // get the lock snapshot for a room
     public Map<String, FileLockInfo> getRoomLockSnapshot(String roomCode) {
         Map<String, FileLockInfo> fileLocks = roomLocks.get(roomCode);
         if (fileLocks == null) {

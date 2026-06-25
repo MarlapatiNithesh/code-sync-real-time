@@ -4,19 +4,7 @@ import { useEffect } from "react"
 function usePageEvents() {
     const { fontSize, setFontSize } = useSettings()
 
-    useEffect(() => {
-        // Prevent user from leaving the page
-        const beforeUnloadHandler = (e: any) => {
-            const msg = "Changes you made may not be saved"
-            return (e.returnValue = msg)
-        }
 
-        window.addEventListener("beforeunload", beforeUnloadHandler)
-
-        return () => {
-            window.removeEventListener("beforeunload", beforeUnloadHandler)
-        }
-    }, [])
 
     useEffect(() => {
         const handleWheel = (e: any) => {

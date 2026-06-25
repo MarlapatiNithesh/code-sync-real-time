@@ -23,6 +23,7 @@ public class RoomService {
     private final RoomRepository roomRepository;
     private final RegisteredUserRepository registeredUserRepository;
     private final RoomDataCacheService roomDataCacheService;
+    private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
     @Transactional
     @org.springframework.cache.annotation.CacheEvict(value = "ownerRooms", allEntries = true)
@@ -58,7 +59,7 @@ public class RoomService {
 
     @Cacheable(value = "rooms", key = "#roomCode")
     public RoomResponse getRoomByCode(String roomCode) {
-        RoomEntity room = roomRepository.findByRoomCode(roomCode)
+        RoomSummaryDto room = roomRepository.findSummaryByRoomCode(roomCode)
                 .orElseThrow(() -> new IllegalArgumentException("Room not found"));
         return toResponse(room);
     }
@@ -84,6 +85,7 @@ public class RoomService {
                 .ownerUsername(room.getOwner().getUsername())
                 .createdAt(room.getCreatedAt())
                 .updatedAt(room.getUpdatedAt())
+                .participants(getParticipants(room.getRoomCode()))
                 .build();
     }
 
@@ -96,6 +98,33 @@ public class RoomService {
                 .ownerUsername(room.getOwnerUsername())
                 .createdAt(room.getCreatedAt())
                 .updatedAt(room.getUpdatedAt())
+                .participants(getParticipants(room.getRoomCode()))
                 .build();
+    }
+
+    private List<String> getParticipants(String roomCode) {
+        try {
+            java.util.Set<String> members = stringRedisTemplate.opsForSet().members("room:participants:" + roomCode);
+            if (members != null) {
+                return new java.util.ArrayList<>(members);
+            }
+        } catch (Exception e) {
+            // Ignore/log
+        }
+        return java.util.Collections.emptyList();
+    }
+
+    @org.springframework.cache.annotation.CacheEvict(value = {"rooms", "ownerRooms"}, allEntries = true)
+    public void evictRoomCaches() {
+        // Handled by annotation
+    }
+
+    public void saveSnapshot(String roomCode, Object fileStructure, Object drawingData) {
+        if (fileStructure != null) {
+            roomDataCacheService.updateFileStructure(roomCode, fileStructure);
+        }
+        if (drawingData != null) {
+            roomDataCacheService.updateDrawingData(roomCode, drawingData);
+        }
     }
 }

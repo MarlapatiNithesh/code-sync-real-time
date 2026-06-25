@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext"
 import { FormEvent, useEffect, useState, useRef } from "react"
 import { toast } from "react-hot-toast"
 import { useNavigate } from "react-router-dom"
+import { LuCopy } from "react-icons/lu"
 
 function DashboardPage() {
     const { user, logout } = useAuth()
@@ -24,6 +25,36 @@ function DashboardPage() {
     const [joinRoomId, setJoinRoomId] = useState("")
 
     const PAGE_SIZE = 5
+
+    const copyToClipboard = async (text: string) => {
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(text)
+                toast.success("Room ID copied to clipboard")
+                return
+            } catch (error) {
+                console.error("Secure clipboard copy failed, using fallback...", error)
+            }
+        }
+
+        // Fallback copy method for insecure contexts (e.g. non-localhost HTTP)
+        const textarea = document.createElement("textarea")
+        textarea.value = text
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        try {
+            document.execCommand("copy")
+            toast.success("Room ID copied to clipboard")
+        } catch (err) {
+            toast.error("Failed to copy Room ID")
+            console.error("Fallback copy failed:", err)
+        }
+        document.body.removeChild(textarea)
+    }
+
 
     // Refs for scroll pagination detection (Intersection Observer)
     const createdObserverRef = useRef<HTMLDivElement | null>(null)
@@ -49,7 +80,7 @@ function DashboardPage() {
         }
     }
 
-    const loadJoinedRooms = () => {
+    const loadJoinedRooms = async () => {
         if (user?.email) {
             const stored = localStorage.getItem(`joinedRooms_${user.email}`)
             if (stored) {
@@ -57,6 +88,25 @@ function DashboardPage() {
                 setAllJoinedRooms(parsed)
                 setVisibleJoinedRooms(parsed.slice(0, PAGE_SIZE))
                 setJoinedPage(0)
+
+                // Fetch fresh details for each joined room in the background
+                try {
+                    const freshRoomsResults = await Promise.all(
+                        parsed.map(async (r) => {
+                            try {
+                                return await getRoomByCode(r.roomCode)
+                            } catch {
+                                return null
+                            }
+                        })
+                    )
+                    const activeRooms = freshRoomsResults.filter((r): r is Room => r !== null)
+                    localStorage.setItem(`joinedRooms_${user.email}`, JSON.stringify(activeRooms))
+                    setAllJoinedRooms(activeRooms)
+                    setVisibleJoinedRooms(activeRooms.slice(0, PAGE_SIZE))
+                } catch (e) {
+                    console.error("Failed to sync joined rooms from server", e)
+                }
             }
         }
     }
@@ -144,7 +194,15 @@ function DashboardPage() {
 
     const handleJoinRoom = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
-        const code = joinRoomId.trim()
+        let code = joinRoomId.trim()
+
+        // Extract UUID if a URL or path was pasted
+        const uuidRegex = /[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}/
+        const match = code.match(uuidRegex)
+        if (match) {
+            code = match[0]
+        }
+
         if (code.length < 5) {
             toast.error("Room ID must be at least 5 characters")
             return
@@ -156,7 +214,7 @@ function DashboardPage() {
             toast.dismiss()
             toast.success("Room found! Joining...")
 
-            if (user?.email && room.ownerId !== user.id) {
+            if (user?.email) {
                 const storageKey = `joinedRooms_${user.email}`
                 const storedJoinedRooms = localStorage.getItem(storageKey)
                 let list: Room[] = storedJoinedRooms ? JSON.parse(storedJoinedRooms) : []
@@ -259,9 +317,21 @@ function DashboardPage() {
                                             >
                                                 <div>
                                                     <h2 className="text-lg font-semibold">{room.name}</h2>
-                                                    <p className="text-sm text-gray-400">
-                                                        Room ID: <span className="font-mono">{room.roomCode}</span>
+                                                    <p className="text-sm text-gray-400 flex items-center gap-1.5">
+                                                        Room ID: <span className="font-mono select-all">{room.roomCode}</span>
+                                                        <button
+                                                            onClick={() => copyToClipboard(room.roomCode)}
+                                                            className="text-gray-500 hover:text-primary transition-colors p-1"
+                                                            title="Copy Room ID"
+                                                        >
+                                                            <LuCopy size={14} />
+                                                        </button>
                                                     </p>
+                                                    {room.participants && room.participants.length > 0 && (
+                                                        <p className="text-xs text-gray-400 mt-1">
+                                                            Joined: <span className="text-[#50fa7b] font-medium">{room.participants.join(", ")}</span>
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <button
                                                     onClick={() => openRoom(room.roomCode)}
@@ -294,10 +364,22 @@ function DashboardPage() {
                                             >
                                                 <div>
                                                     <h2 className="text-lg font-semibold">{room.name}</h2>
-                                                    <p className="text-sm text-gray-400">
-                                                        Room ID: <span className="font-mono">{room.roomCode}</span>
-                                                        <span className="ml-2 text-xs text-gray-500">(Owner: {room.ownerUsername})</span>
+                                                    <p className="text-sm text-gray-400 flex items-center gap-1.5">
+                                                        Room ID: <span className="font-mono select-all">{room.roomCode}</span>
+                                                        <span className="text-xs text-gray-500">(Owner: {room.ownerUsername})</span>
+                                                        <button
+                                                            onClick={() => copyToClipboard(room.roomCode)}
+                                                            className="text-gray-500 hover:text-primary transition-colors p-1"
+                                                            title="Copy Room ID"
+                                                        >
+                                                            <LuCopy size={14} />
+                                                        </button>
                                                     </p>
+                                                    {room.participants && room.participants.length > 0 && (
+                                                        <p className="text-xs text-gray-400 mt-1">
+                                                            Joined: <span className="text-[#50fa7b] font-medium">{room.participants.join(", ")}</span>
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <button
                                                     onClick={() => openRoom(room.roomCode)}

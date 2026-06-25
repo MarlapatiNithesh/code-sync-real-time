@@ -4,6 +4,8 @@ import { VIEWS } from "@/types/view"
 import { useState } from "react"
 import { Tooltip } from "react-tooltip"
 import { buttonStyles, tooltipStyles } from "../tooltipStyles"
+import { useAppContext } from "@/context/AppContext"
+import { ACTIVITY_STATE } from "@/types/app"
 
 interface ViewButtonProps {
     viewName: VIEWS
@@ -13,10 +15,19 @@ interface ViewButtonProps {
 const ViewButton = ({ viewName, icon }: ViewButtonProps) => {
     const { activeView, setActiveView, isSidebarOpen, setIsSidebarOpen } =
         useViews()
+    const { activityState, setActivityState } = useAppContext()
     const { isNewMessage } = useChatRoom()
     const [showTooltip, setShowTooltip] = useState(true)
 
     const handleViewClick = (viewName: VIEWS) => {
+        if (activityState === ACTIVITY_STATE.DRAWING && (
+            viewName === VIEWS.FILES ||
+            viewName === VIEWS.RUN ||
+            viewName === VIEWS.COPILOT
+        )) {
+            setActivityState(ACTIVITY_STATE.CODING)
+        }
+
         if (viewName === activeView) {
             setIsSidebarOpen(!isSidebarOpen)
         } else {

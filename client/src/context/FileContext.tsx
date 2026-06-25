@@ -21,12 +21,14 @@ import {
     useCallback,
     useContext,
     useEffect,
+    useRef,
     useState,
 } from "react"
 import { toast } from "react-hot-toast"
 import { v4 as uuidv4 } from "uuid"
 import { useAppContext } from "./AppContext"
 import { useSocket } from "./SocketContext"
+import { useParams } from "react-router-dom"
 
 const FileContext = createContext<FileContextType | null>(null)
 
@@ -41,6 +43,7 @@ export const useFileSystem = (): FileContextType => {
 function FileContextProvider({ children }: { children: ReactNode }) {
     const { socket } = useSocket()
     const { setUsers, drawingData, setDrawingData, currentUser } = useAppContext()
+    const { roomId } = useParams<{ roomId: string }>()
 
     const [fileStructure, setFileStructure] =
         useState<FileSystemItem>(initialFileStructure)
@@ -49,9 +52,22 @@ function FileContextProvider({ children }: { children: ReactNode }) {
         : []
     const [openFiles, setOpenFiles] =
         useState<FileSystemItem[]>(initialOpenFiles)
-    const [activeFile, setActiveFile] = useState<FileSystemItem | null>(
-        openFiles[0],
-    )
+    const [activeFile, setActiveFile] = useState<FileSystemItem | null>(() => {
+        const storedId = sessionStorage.getItem("activeFileId")
+        if (storedId) {
+            const found = openFiles.find((f) => f.id === storedId)
+            if (found) return found
+        }
+        return openFiles[0] || null
+    })
+
+    useEffect(() => {
+        if (activeFile) {
+            sessionStorage.setItem("activeFileId", activeFile.id)
+        } else {
+            sessionStorage.removeItem("activeFileId")
+        }
+    }, [activeFile])
     const [fileLocks, setFileLocks] = useState<Record<string, FileLockInfo>>({})
 
     const isFileEditable = useCallback(
@@ -764,16 +780,84 @@ function FileContextProvider({ children }: { children: ReactNode }) {
 
 
 
+    const fileStructureRef = useRef(fileStructure)
+    const drawingDataRef = useRef(drawingData)
+
     useEffect(() => {
-        const timer = setTimeout(() => {
+        fileStructureRef.current = fileStructure
+        drawingDataRef.current = drawingData
+    }, [fileStructure, drawingData])
+
+    useEffect(() => {
+        const handleUnload = () => {
+            if (!roomId) return
+            const payload = {
+                fileStructure: fileStructureRef.current,
+                drawingData: drawingDataRef.current,
+            }
+            const token = localStorage.getItem("authToken")
+            const headers = {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            }
+            fetch(
+                `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api/rooms/code/${roomId}/snapshot`,
+                {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify(payload),
+                    keepalive: true,
+                }
+            ).catch((err) => console.error("Snapshot keepalive save failed", err))
+        }
+
+        window.addEventListener("beforeunload", handleUnload)
+        return () => {
+            window.removeEventListener("beforeunload", handleUnload)
+            handleUnload()
+        }
+    }, [roomId])
+
+    useEffect(() => {
+        const timer = setInterval(() => {
             socket.emit(SocketEvent.ROOM_SNAPSHOT, {
-                fileStructure,
-                drawingData,
+                fileStructure: fileStructureRef.current,
+                drawingData: drawingDataRef.current,
             })
         }, 5000)
 
+        return () => {
+            clearInterval(timer)
+            socket.emit(SocketEvent.ROOM_SNAPSHOT, {
+                fileStructure: fileStructureRef.current,
+                drawingData: drawingDataRef.current,
+            })
+        }
+    }, [socket])
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            socket.emit(SocketEvent.ROOM_SNAPSHOT, {
+                fileStructure: fileStructure,
+                drawingData: drawingDataRef.current,
+            })
+        }, 1500)
+
         return () => clearTimeout(timer)
-    }, [drawingData, fileStructure, socket])
+    }, [fileStructure, socket])
+
+    useEffect(() => {
+        if (!drawingData) return
+
+        const timer = setTimeout(() => {
+            socket.emit(SocketEvent.ROOM_SNAPSHOT, {
+                fileStructure: fileStructureRef.current,
+                drawingData: drawingData,
+            })
+        }, 1500)
+
+        return () => clearTimeout(timer)
+    }, [drawingData, socket])
 
     useEffect(() => {
         const handleJoinAccepted = ({
@@ -792,7 +876,9 @@ function FileContextProvider({ children }: { children: ReactNode }) {
                         (item) => item.type === "file",
                     ) || []
                 setOpenFiles(files)
-                setActiveFile(files[0] || null)
+                const storedId = sessionStorage.getItem("activeFileId")
+                const found = files.find((f) => f.id === storedId)
+                setActiveFile(found || files[0] || null)
             }
 
             if (serverDrawingData) {

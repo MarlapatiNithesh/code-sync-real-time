@@ -47,4 +47,13 @@ public class RoomController {
     public RoomResponse getRoomByCode(@PathVariable String roomCode) {
         return roomService.getRoomByCode(roomCode);
     }
+
+    @PostMapping("/code/{roomCode}/snapshot")
+    @ResponseStatus(HttpStatus.OK)
+    public void saveSnapshot(
+            @PathVariable String roomCode,
+            @RequestBody java.util.Map<String, Object> payload
+    ) {
+        roomService.saveSnapshot(roomCode, payload.get("fileStructure"), payload.get("drawingData"));
+    }
 }

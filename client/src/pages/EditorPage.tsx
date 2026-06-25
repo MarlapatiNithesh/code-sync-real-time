@@ -56,11 +56,8 @@ function EditorPage() {
                 
                 // Add if not already present
                 if (!joinedRoomsList.some(r => r.roomCode === roomId)) {
-                    // Only list if the user is not the owner (since they see those under Created Rooms)
-                    if (roomInfo.ownerId !== authUser.id) {
-                        joinedRoomsList = [roomInfo, ...joinedRoomsList]
-                        localStorage.setItem(storageKey, JSON.stringify(joinedRoomsList))
-                    }
+                    joinedRoomsList = [roomInfo, ...joinedRoomsList]
+                    localStorage.setItem(storageKey, JSON.stringify(joinedRoomsList))
                 }
             } catch (err) {
                 console.error("Failed to fetch room details for storage", err)
